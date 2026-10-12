@@ -18,6 +18,15 @@ This file provides guidance to Codex when working with code in this repository.
 
 **Entry point:** `CmsQBitProducer implements QBitMetaDataProducer<CmsQBitConfig>` in `com.kingsrook.qbits.cms`. The producer builds every table, possible-value source, app and widget itself (no package scanning); `CmsFeature` flags switch feature areas on and off. The schema is a prefix-parameterized Liquibase changelog the host includes and runs (`src/main/resources/qbit-cms/db/changelog/`); the qbit never runs DDL.
 
+Packages:
+
+- `CmsQBitConfig`, `CmsFeature`, `CmsTables` (logical names and table definitions), `CmsRuntime`, `CmsSchemaCheck` (startup check), `CmsStartupMode`.
+- `core/model`: CORE entities. Their `TABLE_NAME` and possible-value source names are logical; the builder adds the prefix.
+- `metadata`: `CmsTableBuilder` (tables, possible values, joins, child lists, associations, permission rules), `CmsAppBuilder` and `CmsAreas` (apps and homes).
+- `home`: `CmsHomeRenderer` and `CmsHtml` (one renderer for every home; reads run with `PermissionEnforcement.ENFORCE`).
+- `security`: `CmsRole`, `CmsSecurity`, `CmsOpenReadsPermissionChecker`.
+- Schema: `src/main/resources/qbit-cms/db/changelog/qbit-cms.changelog.yaml`. Its changesets are append-only once released, and `docs/ddl/postgres.sql` is generated from it.
+
 ## Naming (owner rule)
 
 - Tables are lowercase snake_case prefixed with the full qbit name: `cms_<name>`. The QQQ table name and the backend (SQL) name are identical; possible-value sources take the table name.

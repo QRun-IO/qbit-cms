@@ -23,6 +23,7 @@
       <maven.compiler.target>21</maven.compiler.target>
       <jacoco.version>0.8.15</jacoco.version>
       <liquibase.version>4.33.0</liquibase.version>
+      <testcontainers.version>1.21.4</testcontainers.version>
    </properties>
 
    <parent>
@@ -95,6 +96,23 @@
          <scope>test</scope>
       </dependency>
       <dependency>
+         <groupId>com.kingsrook.qqq</groupId>
+         <artifactId>qqq-backend-module-postgres</artifactId>
+         <scope>test</scope>
+      </dependency>
+      <dependency>
+         <groupId>org.testcontainers</groupId>
+         <artifactId>postgresql</artifactId>
+         <version>${testcontainers.version}</version>
+         <scope>test</scope>
+      </dependency>
+      <dependency>
+         <groupId>org.testcontainers</groupId>
+         <artifactId>junit-jupiter</artifactId>
+         <version>${testcontainers.version}</version>
+         <scope>test</scope>
+      </dependency>
+      <dependency>
          <groupId>org.liquibase</groupId>
          <artifactId>liquibase-core</artifactId>
          <version>${liquibase.version}</version>
@@ -104,6 +122,37 @@
 
    <build>
       <plugins>
+         <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-checkstyle-plugin</artifactId>
+            <version>3.3.1</version>
+            <dependencies>
+               <dependency>
+                  <groupId>com.puppycrawl.tools</groupId>
+                  <artifactId>checkstyle</artifactId>
+                  <version>10.12.6</version>
+               </dependency>
+            </dependencies>
+            <configuration>
+               <configLocation>checkstyle/config.xml</configLocation>
+               <headerLocation>checkstyle/license.txt</headerLocation>
+               <encoding>UTF-8</encoding>
+               <consoleOutput>true</consoleOutput>
+               <failsOnError>false</failsOnError>
+               <failOnViolation>true</failOnViolation>
+               <violationSeverity>warning</violationSeverity>
+               <includeTestSourceDirectory>false</includeTestSourceDirectory>
+            </configuration>
+            <executions>
+               <execution>
+                  <id>validate</id>
+                  <phase>validate</phase>
+                  <goals>
+                     <goal>check</goal>
+                  </goals>
+               </execution>
+            </executions>
+         </plugin>
          <plugin>
             <groupId>org.jacoco</groupId>
             <artifactId>jacoco-maven-plugin</artifactId>

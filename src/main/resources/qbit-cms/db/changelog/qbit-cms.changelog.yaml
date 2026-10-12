@@ -1,0 +1,1004 @@
+# qbit-cms schema, version 1.0.0 baseline.
+#
+# The host includes this file from the qbit jar and runs it with its own
+# Liquibase (the qbit never runs DDL). Properties the host may set before the
+# include (the first definition wins):
+#   cms.tablePrefix  table name prefix, must equal CmsQBitConfig.tableNamePrefix (default cms_)
+#   cms.features     comma-separated CmsFeature names to install (default: all)
+#   cms.seedReferenceData  insert the generic redirect, page and section types (default true)
+# Changesets are only ever appended; released changesets never change.
+databaseChangeLog:
+  - property: { name: cms.tablePrefix, value: cms_ }
+  - property: { name: cms.features, value: "CORE,MEDIA,BLOG,PROJECTS,PHOTOS,PUBLISHING,STREAM" }
+  - property: { name: cms.seedReferenceData, value: "true" }
+
+  # Halt when a table with a qbit-cms name exists but was not created by this
+  # changelog (a name collision): choose another cms.tablePrefix.
+  - changeSet:
+      id: 1.0.0-guard-existing-tables
+      author: qbit-cms
+      logicalFilePath: qbit-cms/changelog
+      runAlways: true
+      preConditions:
+        - onFail: HALT
+        - onFailMessage: "A table named ${cms.tablePrefix}<name> exists but was not created by qbit-cms; set a different cms.tablePrefix"
+        - sqlCheck:
+            expectedResult: 0
+            sql: >-
+              SELECT COUNT(*) FROM (VALUES ('site'), ('domain'), ('redirect_type'), ('redirect'), ('page_type'), ('page'), ('page_section_type'), ('page_section'), ('snippet'), ('menu'), ('menu_item')) AS v(n)
+              WHERE EXISTS (SELECT 1 FROM information_schema.tables t WHERE LOWER(t.table_name) = LOWER(CONCAT('${cms.tablePrefix}', v.n)))
+              AND NOT EXISTS (SELECT 1 FROM DATABASECHANGELOG c WHERE c.FILENAME = 'qbit-cms/changelog' AND c.ID = CONCAT('1.0.0-create-', v.n))
+      changes:
+        - sql:
+            sql: SELECT 1
+
+  - changeSet:
+      id: 1.0.0-create-site
+      author: qbit-cms
+      logicalFilePath: qbit-cms/changelog
+      preConditions:
+        - onFail: CONTINUE
+        - sqlCheck:
+            expectedResult: 1
+            sql: SELECT CASE WHEN POSITION(',CORE,' IN CONCAT(',', REPLACE('${cms.features}', ' ', ''), ',')) > 0 THEN 1 ELSE 0 END
+      changes:
+        - createTable:
+            tableName: ${cms.tablePrefix}site
+            columns:
+              - column:
+                  name: id
+                  type: BIGINT
+                  autoIncrement: true
+                  constraints: { primaryKey: true, primaryKeyName: "pk_${cms.tablePrefix}site", nullable: false }
+              - column:
+                  name: name
+                  type: VARCHAR(40)
+                  constraints: { nullable: false }
+              - column:
+                  name: short_name
+                  type: VARCHAR(20)
+                  constraints: { nullable: false }
+              - column:
+                  name: description
+                  type: VARCHAR(255)
+              - column:
+                  name: create_date
+                  type: TIMESTAMP
+                  constraints: { nullable: false }
+              - column:
+                  name: modify_date
+                  type: TIMESTAMP
+                  constraints: { nullable: false }
+        - addUniqueConstraint:
+            tableName: ${cms.tablePrefix}site
+            columnNames: name
+            constraintName: uq_${cms.tablePrefix}site_name
+
+  - changeSet:
+      id: 1.0.0-create-domain
+      author: qbit-cms
+      logicalFilePath: qbit-cms/changelog
+      preConditions:
+        - onFail: CONTINUE
+        - sqlCheck:
+            expectedResult: 1
+            sql: SELECT CASE WHEN POSITION(',CORE,' IN CONCAT(',', REPLACE('${cms.features}', ' ', ''), ',')) > 0 THEN 1 ELSE 0 END
+      changes:
+        - createTable:
+            tableName: ${cms.tablePrefix}domain
+            columns:
+              - column:
+                  name: id
+                  type: BIGINT
+                  autoIncrement: true
+                  constraints: { primaryKey: true, primaryKeyName: "pk_${cms.tablePrefix}domain", nullable: false }
+              - column:
+                  name: name
+                  type: VARCHAR(40)
+                  constraints: { nullable: false }
+              - column:
+                  name: short_name
+                  type: VARCHAR(20)
+                  constraints: { nullable: false }
+              - column:
+                  name: description
+                  type: VARCHAR(255)
+              - column:
+                  name: fqdn
+                  type: VARCHAR(255)
+                  constraints: { nullable: false }
+              - column:
+                  name: is_primary
+                  type: BOOLEAN
+                  constraints: { nullable: false }
+              - column:
+                  name: site_id
+                  type: BIGINT
+                  constraints: { nullable: false }
+              - column:
+                  name: create_date
+                  type: TIMESTAMP
+                  constraints: { nullable: false }
+              - column:
+                  name: modify_date
+                  type: TIMESTAMP
+                  constraints: { nullable: false }
+        - addUniqueConstraint:
+            tableName: ${cms.tablePrefix}domain
+            columnNames: short_name
+            constraintName: uq_${cms.tablePrefix}domain_short_name
+        - addUniqueConstraint:
+            tableName: ${cms.tablePrefix}domain
+            columnNames: name
+            constraintName: uq_${cms.tablePrefix}domain_name
+        - addUniqueConstraint:
+            tableName: ${cms.tablePrefix}domain
+            columnNames: fqdn
+            constraintName: uq_${cms.tablePrefix}domain_fqdn
+
+  - changeSet:
+      id: 1.0.0-create-redirect_type
+      author: qbit-cms
+      logicalFilePath: qbit-cms/changelog
+      preConditions:
+        - onFail: CONTINUE
+        - sqlCheck:
+            expectedResult: 1
+            sql: SELECT CASE WHEN POSITION(',CORE,' IN CONCAT(',', REPLACE('${cms.features}', ' ', ''), ',')) > 0 THEN 1 ELSE 0 END
+      changes:
+        - createTable:
+            tableName: ${cms.tablePrefix}redirect_type
+            columns:
+              - column:
+                  name: id
+                  type: BIGINT
+                  autoIncrement: true
+                  constraints: { primaryKey: true, primaryKeyName: "pk_${cms.tablePrefix}redirect_type", nullable: false }
+              - column:
+                  name: name
+                  type: VARCHAR(100)
+                  constraints: { nullable: false }
+              - column:
+                  name: code
+                  type: VARCHAR(50)
+                  constraints: { nullable: false }
+              - column:
+                  name: description
+                  type: VARCHAR(500)
+              - column:
+                  name: http_status_code
+                  type: INT
+                  constraints: { nullable: false }
+              - column:
+                  name: is_active
+                  type: BOOLEAN
+                  constraints: { nullable: false }
+              - column:
+                  name: sort_order
+                  type: INT
+                  constraints: { nullable: false }
+              - column:
+                  name: create_date
+                  type: TIMESTAMP
+                  constraints: { nullable: false }
+              - column:
+                  name: modify_date
+                  type: TIMESTAMP
+                  constraints: { nullable: false }
+        - addUniqueConstraint:
+            tableName: ${cms.tablePrefix}redirect_type
+            columnNames: code
+            constraintName: uq_${cms.tablePrefix}redirect_type_code
+
+  - changeSet:
+      id: 1.0.0-create-redirect
+      author: qbit-cms
+      logicalFilePath: qbit-cms/changelog
+      preConditions:
+        - onFail: CONTINUE
+        - sqlCheck:
+            expectedResult: 1
+            sql: SELECT CASE WHEN POSITION(',CORE,' IN CONCAT(',', REPLACE('${cms.features}', ' ', ''), ',')) > 0 THEN 1 ELSE 0 END
+      changes:
+        - createTable:
+            tableName: ${cms.tablePrefix}redirect
+            columns:
+              - column:
+                  name: id
+                  type: BIGINT
+                  autoIncrement: true
+                  constraints: { primaryKey: true, primaryKeyName: "pk_${cms.tablePrefix}redirect", nullable: false }
+              - column:
+                  name: name
+                  type: VARCHAR(100)
+                  constraints: { nullable: false }
+              - column:
+                  name: description
+                  type: VARCHAR(500)
+              - column:
+                  name: source_path
+                  type: VARCHAR(500)
+                  constraints: { nullable: false }
+              - column:
+                  name: target_path
+                  type: VARCHAR(500)
+                  constraints: { nullable: false }
+              - column:
+                  name: redirect_type_id
+                  type: BIGINT
+                  constraints: { nullable: false }
+              - column:
+                  name: match_type
+                  type: VARCHAR(20)
+                  constraints: { nullable: false }
+              - column:
+                  name: is_active
+                  type: BOOLEAN
+                  constraints: { nullable: false }
+              - column:
+                  name: priority
+                  type: INT
+                  constraints: { nullable: false }
+              - column:
+                  name: preserve_query_params
+                  type: BOOLEAN
+                  constraints: { nullable: false }
+              - column:
+                  name: hit_count
+                  type: BIGINT
+                  constraints: { nullable: false }
+              - column:
+                  name: last_hit_date
+                  type: TIMESTAMP
+              - column:
+                  name: expiry_date
+                  type: TIMESTAMP
+              - column:
+                  name: site_id
+                  type: BIGINT
+                  constraints: { nullable: false }
+              - column:
+                  name: create_date
+                  type: TIMESTAMP
+                  constraints: { nullable: false }
+              - column:
+                  name: modify_date
+                  type: TIMESTAMP
+                  constraints: { nullable: false }
+
+  - changeSet:
+      id: 1.0.0-create-page_type
+      author: qbit-cms
+      logicalFilePath: qbit-cms/changelog
+      preConditions:
+        - onFail: CONTINUE
+        - sqlCheck:
+            expectedResult: 1
+            sql: SELECT CASE WHEN POSITION(',CORE,' IN CONCAT(',', REPLACE('${cms.features}', ' ', ''), ',')) > 0 THEN 1 ELSE 0 END
+      changes:
+        - createTable:
+            tableName: ${cms.tablePrefix}page_type
+            columns:
+              - column:
+                  name: id
+                  type: BIGINT
+                  autoIncrement: true
+                  constraints: { primaryKey: true, primaryKeyName: "pk_${cms.tablePrefix}page_type", nullable: false }
+              - column:
+                  name: name
+                  type: VARCHAR(100)
+                  constraints: { nullable: false }
+              - column:
+                  name: code
+                  type: VARCHAR(50)
+                  constraints: { nullable: false }
+              - column:
+                  name: description
+                  type: VARCHAR(255)
+              - column:
+                  name: is_active
+                  type: BOOLEAN
+                  constraints: { nullable: false }
+              - column:
+                  name: sort_order
+                  type: INT
+                  constraints: { nullable: false }
+              - column:
+                  name: create_date
+                  type: TIMESTAMP
+                  constraints: { nullable: false }
+              - column:
+                  name: modify_date
+                  type: TIMESTAMP
+                  constraints: { nullable: false }
+        - addUniqueConstraint:
+            tableName: ${cms.tablePrefix}page_type
+            columnNames: name
+            constraintName: uq_${cms.tablePrefix}page_type_name
+        - addUniqueConstraint:
+            tableName: ${cms.tablePrefix}page_type
+            columnNames: code
+            constraintName: uq_${cms.tablePrefix}page_type_code
+
+  - changeSet:
+      id: 1.0.0-create-page
+      author: qbit-cms
+      logicalFilePath: qbit-cms/changelog
+      preConditions:
+        - onFail: CONTINUE
+        - sqlCheck:
+            expectedResult: 1
+            sql: SELECT CASE WHEN POSITION(',CORE,' IN CONCAT(',', REPLACE('${cms.features}', ' ', ''), ',')) > 0 THEN 1 ELSE 0 END
+      changes:
+        - createTable:
+            tableName: ${cms.tablePrefix}page
+            columns:
+              - column:
+                  name: id
+                  type: BIGINT
+                  autoIncrement: true
+                  constraints: { primaryKey: true, primaryKeyName: "pk_${cms.tablePrefix}page", nullable: false }
+              - column:
+                  name: name
+                  type: VARCHAR(100)
+                  constraints: { nullable: false }
+              - column:
+                  name: slug
+                  type: VARCHAR(100)
+                  constraints: { nullable: false }
+              - column:
+                  name: title
+                  type: VARCHAR(200)
+                  constraints: { nullable: false }
+              - column:
+                  name: content
+                  type: TEXT
+              - column:
+                  name: page_type_id
+                  type: BIGINT
+                  constraints: { nullable: false }
+              - column:
+                  name: template
+                  type: VARCHAR(50)
+              - column:
+                  name: is_published
+                  type: BOOLEAN
+                  constraints: { nullable: false }
+              - column:
+                  name: publish_date
+                  type: TIMESTAMP
+              - column:
+                  name: sort_order
+                  type: INT
+                  constraints: { nullable: false }
+              - column:
+                  name: parent_page_id
+                  type: BIGINT
+              - column:
+                  name: site_id
+                  type: BIGINT
+                  constraints: { nullable: false }
+              - column:
+                  name: meta_description
+                  type: VARCHAR(500)
+              - column:
+                  name: meta_keywords
+                  type: VARCHAR(255)
+              - column:
+                  name: og_image
+                  type: VARCHAR(255)
+              - column:
+                  name: create_date
+                  type: TIMESTAMP
+                  constraints: { nullable: false }
+              - column:
+                  name: modify_date
+                  type: TIMESTAMP
+                  constraints: { nullable: false }
+        - addUniqueConstraint:
+            tableName: ${cms.tablePrefix}page
+            columnNames: slug, site_id
+            constraintName: uq_${cms.tablePrefix}page_slug_site_id
+        - addUniqueConstraint:
+            tableName: ${cms.tablePrefix}page
+            columnNames: slug, parent_page_id
+            constraintName: uq_${cms.tablePrefix}page_slug_parent_page_id
+
+  - changeSet:
+      id: 1.0.0-create-page_section_type
+      author: qbit-cms
+      logicalFilePath: qbit-cms/changelog
+      preConditions:
+        - onFail: CONTINUE
+        - sqlCheck:
+            expectedResult: 1
+            sql: SELECT CASE WHEN POSITION(',CORE,' IN CONCAT(',', REPLACE('${cms.features}', ' ', ''), ',')) > 0 THEN 1 ELSE 0 END
+      changes:
+        - createTable:
+            tableName: ${cms.tablePrefix}page_section_type
+            columns:
+              - column:
+                  name: id
+                  type: BIGINT
+                  autoIncrement: true
+                  constraints: { primaryKey: true, primaryKeyName: "pk_${cms.tablePrefix}page_section_type", nullable: false }
+              - column:
+                  name: name
+                  type: VARCHAR(100)
+                  constraints: { nullable: false }
+              - column:
+                  name: code
+                  type: VARCHAR(50)
+                  constraints: { nullable: false }
+              - column:
+                  name: description
+                  type: VARCHAR(255)
+              - column:
+                  name: is_active
+                  type: BOOLEAN
+                  constraints: { nullable: false }
+              - column:
+                  name: sort_order
+                  type: INT
+                  constraints: { nullable: false }
+              - column:
+                  name: create_date
+                  type: TIMESTAMP
+                  constraints: { nullable: false }
+              - column:
+                  name: modify_date
+                  type: TIMESTAMP
+                  constraints: { nullable: false }
+        - addUniqueConstraint:
+            tableName: ${cms.tablePrefix}page_section_type
+            columnNames: code
+            constraintName: uq_${cms.tablePrefix}page_section_type_code
+        - addUniqueConstraint:
+            tableName: ${cms.tablePrefix}page_section_type
+            columnNames: name
+            constraintName: uq_${cms.tablePrefix}page_section_type_name
+
+  - changeSet:
+      id: 1.0.0-create-page_section
+      author: qbit-cms
+      logicalFilePath: qbit-cms/changelog
+      preConditions:
+        - onFail: CONTINUE
+        - sqlCheck:
+            expectedResult: 1
+            sql: SELECT CASE WHEN POSITION(',CORE,' IN CONCAT(',', REPLACE('${cms.features}', ' ', ''), ',')) > 0 THEN 1 ELSE 0 END
+      changes:
+        - createTable:
+            tableName: ${cms.tablePrefix}page_section
+            columns:
+              - column:
+                  name: id
+                  type: BIGINT
+                  autoIncrement: true
+                  constraints: { primaryKey: true, primaryKeyName: "pk_${cms.tablePrefix}page_section", nullable: false }
+              - column:
+                  name: name
+                  type: VARCHAR(100)
+                  constraints: { nullable: false }
+              - column:
+                  name: css_class_name
+                  type: VARCHAR(255)
+              - column:
+                  name: section_type_id
+                  type: BIGINT
+                  constraints: { nullable: false }
+              - column:
+                  name: content
+                  type: TEXT
+              - column:
+                  name: sort_order
+                  type: INT
+                  constraints: { nullable: false }
+              - column:
+                  name: page_id
+                  type: BIGINT
+                  constraints: { nullable: false }
+              - column:
+                  name: create_date
+                  type: TIMESTAMP
+                  constraints: { nullable: false }
+              - column:
+                  name: modify_date
+                  type: TIMESTAMP
+                  constraints: { nullable: false }
+
+  - changeSet:
+      id: 1.0.0-create-snippet
+      author: qbit-cms
+      logicalFilePath: qbit-cms/changelog
+      preConditions:
+        - onFail: CONTINUE
+        - sqlCheck:
+            expectedResult: 1
+            sql: SELECT CASE WHEN POSITION(',CORE,' IN CONCAT(',', REPLACE('${cms.features}', ' ', ''), ',')) > 0 THEN 1 ELSE 0 END
+      changes:
+        - createTable:
+            tableName: ${cms.tablePrefix}snippet
+            columns:
+              - column:
+                  name: id
+                  type: BIGINT
+                  autoIncrement: true
+                  constraints: { primaryKey: true, primaryKeyName: "pk_${cms.tablePrefix}snippet", nullable: false }
+              - column:
+                  name: name
+                  type: VARCHAR(100)
+                  constraints: { nullable: false }
+              - column:
+                  name: short_name
+                  type: VARCHAR(50)
+                  constraints: { nullable: false }
+              - column:
+                  name: content
+                  type: TEXT
+              - column:
+                  name: css_class_name
+                  type: VARCHAR(255)
+              - column:
+                  name: is_active
+                  type: BOOLEAN
+                  constraints: { nullable: false }
+              - column:
+                  name: sort_order
+                  type: INT
+                  constraints: { nullable: false }
+              - column:
+                  name: site_id
+                  type: BIGINT
+                  constraints: { nullable: false }
+              - column:
+                  name: create_date
+                  type: TIMESTAMP
+                  constraints: { nullable: false }
+              - column:
+                  name: modify_date
+                  type: TIMESTAMP
+                  constraints: { nullable: false }
+        - addUniqueConstraint:
+            tableName: ${cms.tablePrefix}snippet
+            columnNames: short_name, site_id
+            constraintName: uq_${cms.tablePrefix}snippet_short_name_site_id
+
+  - changeSet:
+      id: 1.0.0-create-menu
+      author: qbit-cms
+      logicalFilePath: qbit-cms/changelog
+      preConditions:
+        - onFail: CONTINUE
+        - sqlCheck:
+            expectedResult: 1
+            sql: SELECT CASE WHEN POSITION(',CORE,' IN CONCAT(',', REPLACE('${cms.features}', ' ', ''), ',')) > 0 THEN 1 ELSE 0 END
+      changes:
+        - createTable:
+            tableName: ${cms.tablePrefix}menu
+            columns:
+              - column:
+                  name: id
+                  type: BIGINT
+                  autoIncrement: true
+                  constraints: { primaryKey: true, primaryKeyName: "pk_${cms.tablePrefix}menu", nullable: false }
+              - column:
+                  name: name
+                  type: VARCHAR(100)
+                  constraints: { nullable: false }
+              - column:
+                  name: slug
+                  type: VARCHAR(100)
+                  constraints: { nullable: false }
+              - column:
+                  name: description
+                  type: VARCHAR(255)
+              - column:
+                  name: site_id
+                  type: BIGINT
+                  constraints: { nullable: false }
+              - column:
+                  name: menu_type
+                  type: VARCHAR(50)
+                  constraints: { nullable: false }
+              - column:
+                  name: is_active
+                  type: BOOLEAN
+              - column:
+                  name: create_date
+                  type: TIMESTAMP
+                  constraints: { nullable: false }
+              - column:
+                  name: modify_date
+                  type: TIMESTAMP
+                  constraints: { nullable: false }
+        - addUniqueConstraint:
+            tableName: ${cms.tablePrefix}menu
+            columnNames: slug, site_id
+            constraintName: uq_${cms.tablePrefix}menu_slug_site_id
+
+  - changeSet:
+      id: 1.0.0-create-menu_item
+      author: qbit-cms
+      logicalFilePath: qbit-cms/changelog
+      preConditions:
+        - onFail: CONTINUE
+        - sqlCheck:
+            expectedResult: 1
+            sql: SELECT CASE WHEN POSITION(',CORE,' IN CONCAT(',', REPLACE('${cms.features}', ' ', ''), ',')) > 0 THEN 1 ELSE 0 END
+      changes:
+        - createTable:
+            tableName: ${cms.tablePrefix}menu_item
+            columns:
+              - column:
+                  name: id
+                  type: BIGINT
+                  autoIncrement: true
+                  constraints: { primaryKey: true, primaryKeyName: "pk_${cms.tablePrefix}menu_item", nullable: false }
+              - column:
+                  name: menu_id
+                  type: BIGINT
+                  constraints: { nullable: false }
+              - column:
+                  name: parent_id
+                  type: BIGINT
+              - column:
+                  name: name
+                  type: VARCHAR(100)
+                  constraints: { nullable: false }
+              - column:
+                  name: slug
+                  type: VARCHAR(100)
+                  constraints: { nullable: false }
+              - column:
+                  name: item_type
+                  type: VARCHAR(50)
+                  constraints: { nullable: false }
+              - column:
+                  name: link_url
+                  type: VARCHAR(500)
+              - column:
+                  name: route_path
+                  type: VARCHAR(200)
+              - column:
+                  name: target
+                  type: VARCHAR(20)
+              - column:
+                  name: icon
+                  type: VARCHAR(100)
+              - column:
+                  name: description
+                  type: VARCHAR(255)
+              - column:
+                  name: display_order
+                  type: INT
+              - column:
+                  name: is_active
+                  type: BOOLEAN
+              - column:
+                  name: css_classes
+                  type: VARCHAR(200)
+              - column:
+                  name: create_date
+                  type: TIMESTAMP
+                  constraints: { nullable: false }
+              - column:
+                  name: modify_date
+                  type: TIMESTAMP
+                  constraints: { nullable: false }
+
+  - changeSet:
+      id: 1.0.0-constraints-core
+      author: qbit-cms
+      logicalFilePath: qbit-cms/changelog
+      preConditions:
+        - onFail: CONTINUE
+        - sqlCheck:
+            expectedResult: 1
+            sql: SELECT CASE WHEN POSITION(',CORE,' IN CONCAT(',', REPLACE('${cms.features}', ' ', ''), ',')) > 0 THEN 1 ELSE 0 END
+      changes:
+        - addForeignKeyConstraint:
+            baseTableName: ${cms.tablePrefix}domain
+            baseColumnNames: site_id
+            referencedTableName: ${cms.tablePrefix}site
+            referencedColumnNames: id
+            constraintName: fk_${cms.tablePrefix}domain_site_id
+        - addForeignKeyConstraint:
+            baseTableName: ${cms.tablePrefix}redirect
+            baseColumnNames: redirect_type_id
+            referencedTableName: ${cms.tablePrefix}redirect_type
+            referencedColumnNames: id
+            constraintName: fk_${cms.tablePrefix}redirect_redirect_type_id
+        - addForeignKeyConstraint:
+            baseTableName: ${cms.tablePrefix}redirect
+            baseColumnNames: site_id
+            referencedTableName: ${cms.tablePrefix}site
+            referencedColumnNames: id
+            constraintName: fk_${cms.tablePrefix}redirect_site_id
+        - createIndex:
+            tableName: ${cms.tablePrefix}redirect
+            indexName: idx_${cms.tablePrefix}redirect_site_id_source_path
+            columns:
+              - column: { name: site_id }
+              - column: { name: source_path }
+        - addForeignKeyConstraint:
+            baseTableName: ${cms.tablePrefix}page
+            baseColumnNames: page_type_id
+            referencedTableName: ${cms.tablePrefix}page_type
+            referencedColumnNames: id
+            constraintName: fk_${cms.tablePrefix}page_page_type_id
+        - addForeignKeyConstraint:
+            baseTableName: ${cms.tablePrefix}page
+            baseColumnNames: parent_page_id
+            referencedTableName: ${cms.tablePrefix}page
+            referencedColumnNames: id
+            constraintName: fk_${cms.tablePrefix}page_parent_page_id
+        - addForeignKeyConstraint:
+            baseTableName: ${cms.tablePrefix}page
+            baseColumnNames: site_id
+            referencedTableName: ${cms.tablePrefix}site
+            referencedColumnNames: id
+            constraintName: fk_${cms.tablePrefix}page_site_id
+        - createIndex:
+            tableName: ${cms.tablePrefix}page
+            indexName: idx_${cms.tablePrefix}page_site_id_is_published
+            columns:
+              - column: { name: site_id }
+              - column: { name: is_published }
+        - addForeignKeyConstraint:
+            baseTableName: ${cms.tablePrefix}page_section
+            baseColumnNames: page_id
+            referencedTableName: ${cms.tablePrefix}page
+            referencedColumnNames: id
+            constraintName: fk_${cms.tablePrefix}page_section_page_id
+        - addForeignKeyConstraint:
+            baseTableName: ${cms.tablePrefix}page_section
+            baseColumnNames: section_type_id
+            referencedTableName: ${cms.tablePrefix}page_section_type
+            referencedColumnNames: id
+            constraintName: fk_${cms.tablePrefix}page_section_section_type_id
+        - createIndex:
+            tableName: ${cms.tablePrefix}page_section
+            indexName: idx_${cms.tablePrefix}page_section_page_id
+            columns:
+              - column: { name: page_id }
+        - addForeignKeyConstraint:
+            baseTableName: ${cms.tablePrefix}snippet
+            baseColumnNames: site_id
+            referencedTableName: ${cms.tablePrefix}site
+            referencedColumnNames: id
+            constraintName: fk_${cms.tablePrefix}snippet_site_id
+        - addForeignKeyConstraint:
+            baseTableName: ${cms.tablePrefix}menu
+            baseColumnNames: site_id
+            referencedTableName: ${cms.tablePrefix}site
+            referencedColumnNames: id
+            constraintName: fk_${cms.tablePrefix}menu_site_id
+        - addForeignKeyConstraint:
+            baseTableName: ${cms.tablePrefix}menu_item
+            baseColumnNames: menu_id
+            referencedTableName: ${cms.tablePrefix}menu
+            referencedColumnNames: id
+            constraintName: fk_${cms.tablePrefix}menu_item_menu_id
+        - addForeignKeyConstraint:
+            baseTableName: ${cms.tablePrefix}menu_item
+            baseColumnNames: parent_id
+            referencedTableName: ${cms.tablePrefix}menu_item
+            referencedColumnNames: id
+            constraintName: fk_${cms.tablePrefix}menu_item_parent_id
+        - createIndex:
+            tableName: ${cms.tablePrefix}menu_item
+            indexName: idx_${cms.tablePrefix}menu_item_menu_id
+            columns:
+              - column: { name: menu_id }
+
+  # Generic reference data (never content); off with cms.seedReferenceData=false.
+  - changeSet:
+      id: 1.0.0-seed-redirect_type
+      author: qbit-cms
+      logicalFilePath: qbit-cms/changelog
+      preConditions:
+        - onFail: CONTINUE
+        - sqlCheck:
+            expectedResult: 1
+            sql: SELECT CASE WHEN POSITION(',CORE,' IN CONCAT(',', REPLACE('${cms.features}', ' ', ''), ',')) > 0 AND LOWER('${cms.seedReferenceData}') = 'true' THEN 1 ELSE 0 END
+      changes:
+        - insert:
+            tableName: ${cms.tablePrefix}redirect_type
+            columns:
+              - column: { name: name, value: "Permanent Redirect" }
+              - column: { name: code, value: "PERMANENT" }
+              - column: { name: description, value: "301 Moved Permanently - Use for permanent URL changes" }
+              - column: { name: http_status_code, valueNumeric: 301 }
+              - column: { name: is_active, valueBoolean: true }
+              - column: { name: sort_order, valueNumeric: 1 }
+              - column: { name: create_date, valueComputed: CURRENT_TIMESTAMP }
+              - column: { name: modify_date, valueComputed: CURRENT_TIMESTAMP }
+        - insert:
+            tableName: ${cms.tablePrefix}redirect_type
+            columns:
+              - column: { name: name, value: "Temporary Redirect" }
+              - column: { name: code, value: "TEMPORARY" }
+              - column: { name: description, value: "302 Found - Use for temporary URL changes" }
+              - column: { name: http_status_code, valueNumeric: 302 }
+              - column: { name: is_active, valueBoolean: true }
+              - column: { name: sort_order, valueNumeric: 2 }
+              - column: { name: create_date, valueComputed: CURRENT_TIMESTAMP }
+              - column: { name: modify_date, valueComputed: CURRENT_TIMESTAMP }
+        - insert:
+            tableName: ${cms.tablePrefix}redirect_type
+            columns:
+              - column: { name: name, value: "Permanent Redirect (Alternative)" }
+              - column: { name: code, value: "PERMANENT_ALT" }
+              - column: { name: description, value: "308 Permanent Redirect - Preserves HTTP method" }
+              - column: { name: http_status_code, valueNumeric: 308 }
+              - column: { name: is_active, valueBoolean: true }
+              - column: { name: sort_order, valueNumeric: 3 }
+              - column: { name: create_date, valueComputed: CURRENT_TIMESTAMP }
+              - column: { name: modify_date, valueComputed: CURRENT_TIMESTAMP }
+        - insert:
+            tableName: ${cms.tablePrefix}redirect_type
+            columns:
+              - column: { name: name, value: "Temporary Redirect (Alternative)" }
+              - column: { name: code, value: "TEMPORARY_ALT" }
+              - column: { name: description, value: "307 Temporary Redirect - Preserves HTTP method" }
+              - column: { name: http_status_code, valueNumeric: 307 }
+              - column: { name: is_active, valueBoolean: true }
+              - column: { name: sort_order, valueNumeric: 4 }
+              - column: { name: create_date, valueComputed: CURRENT_TIMESTAMP }
+              - column: { name: modify_date, valueComputed: CURRENT_TIMESTAMP }
+
+  # Generic reference data (never content); off with cms.seedReferenceData=false.
+  - changeSet:
+      id: 1.0.0-seed-page_type
+      author: qbit-cms
+      logicalFilePath: qbit-cms/changelog
+      preConditions:
+        - onFail: CONTINUE
+        - sqlCheck:
+            expectedResult: 1
+            sql: SELECT CASE WHEN POSITION(',CORE,' IN CONCAT(',', REPLACE('${cms.features}', ' ', ''), ',')) > 0 AND LOWER('${cms.seedReferenceData}') = 'true' THEN 1 ELSE 0 END
+      changes:
+        - insert:
+            tableName: ${cms.tablePrefix}page_type
+            columns:
+              - column: { name: name, value: "Static Page" }
+              - column: { name: code, value: "STATIC" }
+              - column: { name: description, value: "A standard static page" }
+              - column: { name: is_active, valueBoolean: true }
+              - column: { name: sort_order, valueNumeric: 1 }
+              - column: { name: create_date, valueComputed: CURRENT_TIMESTAMP }
+              - column: { name: modify_date, valueComputed: CURRENT_TIMESTAMP }
+        - insert:
+            tableName: ${cms.tablePrefix}page_type
+            columns:
+              - column: { name: name, value: "Dynamic Page" }
+              - column: { name: code, value: "DYNAMIC" }
+              - column: { name: description, value: "A page with dynamic content" }
+              - column: { name: is_active, valueBoolean: true }
+              - column: { name: sort_order, valueNumeric: 2 }
+              - column: { name: create_date, valueComputed: CURRENT_TIMESTAMP }
+              - column: { name: modify_date, valueComputed: CURRENT_TIMESTAMP }
+        - insert:
+            tableName: ${cms.tablePrefix}page_type
+            columns:
+              - column: { name: name, value: "Landing Page" }
+              - column: { name: code, value: "LANDING" }
+              - column: { name: description, value: "A marketing or landing page" }
+              - column: { name: is_active, valueBoolean: true }
+              - column: { name: sort_order, valueNumeric: 3 }
+              - column: { name: create_date, valueComputed: CURRENT_TIMESTAMP }
+              - column: { name: modify_date, valueComputed: CURRENT_TIMESTAMP }
+        - insert:
+            tableName: ${cms.tablePrefix}page_type
+            columns:
+              - column: { name: name, value: "Custom Page" }
+              - column: { name: code, value: "CUSTOM" }
+              - column: { name: description, value: "A custom page type" }
+              - column: { name: is_active, valueBoolean: true }
+              - column: { name: sort_order, valueNumeric: 4 }
+              - column: { name: create_date, valueComputed: CURRENT_TIMESTAMP }
+              - column: { name: modify_date, valueComputed: CURRENT_TIMESTAMP }
+
+  # Generic reference data (never content); off with cms.seedReferenceData=false.
+  - changeSet:
+      id: 1.0.0-seed-page_section_type
+      author: qbit-cms
+      logicalFilePath: qbit-cms/changelog
+      preConditions:
+        - onFail: CONTINUE
+        - sqlCheck:
+            expectedResult: 1
+            sql: SELECT CASE WHEN POSITION(',CORE,' IN CONCAT(',', REPLACE('${cms.features}', ' ', ''), ',')) > 0 AND LOWER('${cms.seedReferenceData}') = 'true' THEN 1 ELSE 0 END
+      changes:
+        - insert:
+            tableName: ${cms.tablePrefix}page_section_type
+            columns:
+              - column: { name: name, value: "Text Content" }
+              - column: { name: code, value: "TEXT" }
+              - column: { name: description, value: "General text content section for displaying formatted text" }
+              - column: { name: is_active, valueBoolean: true }
+              - column: { name: sort_order, valueNumeric: 1 }
+              - column: { name: create_date, valueComputed: CURRENT_TIMESTAMP }
+              - column: { name: modify_date, valueComputed: CURRENT_TIMESTAMP }
+        - insert:
+            tableName: ${cms.tablePrefix}page_section_type
+            columns:
+              - column: { name: name, value: "Hero Section" }
+              - column: { name: code, value: "HERO" }
+              - column: { name: description, value: "Hero section typically used for page headers and banners" }
+              - column: { name: is_active, valueBoolean: true }
+              - column: { name: sort_order, valueNumeric: 2 }
+              - column: { name: create_date, valueComputed: CURRENT_TIMESTAMP }
+              - column: { name: modify_date, valueComputed: CURRENT_TIMESTAMP }
+        - insert:
+            tableName: ${cms.tablePrefix}page_section_type
+            columns:
+              - column: { name: name, value: "Gallery" }
+              - column: { name: code, value: "GALLERY" }
+              - column: { name: description, value: "Displays images or media in a gallery format" }
+              - column: { name: is_active, valueBoolean: true }
+              - column: { name: sort_order, valueNumeric: 5 }
+              - column: { name: create_date, valueComputed: CURRENT_TIMESTAMP }
+              - column: { name: modify_date, valueComputed: CURRENT_TIMESTAMP }
+        - insert:
+            tableName: ${cms.tablePrefix}page_section_type
+            columns:
+              - column: { name: name, value: "Contact Form" }
+              - column: { name: code, value: "CONTACT_FORM" }
+              - column: { name: description, value: "Displays a contact form" }
+              - column: { name: is_active, valueBoolean: true }
+              - column: { name: sort_order, valueNumeric: 6 }
+              - column: { name: create_date, valueComputed: CURRENT_TIMESTAMP }
+              - column: { name: modify_date, valueComputed: CURRENT_TIMESTAMP }
+        - insert:
+            tableName: ${cms.tablePrefix}page_section_type
+            columns:
+              - column: { name: name, value: "Blog List" }
+              - column: { name: code, value: "BLOG_LIST" }
+              - column: { name: description, value: "Displays blog posts in a list format" }
+              - column: { name: is_active, valueBoolean: true }
+              - column: { name: sort_order, valueNumeric: 7 }
+              - column: { name: create_date, valueComputed: CURRENT_TIMESTAMP }
+              - column: { name: modify_date, valueComputed: CURRENT_TIMESTAMP }
+        - insert:
+            tableName: ${cms.tablePrefix}page_section_type
+            columns:
+              - column: { name: name, value: "Markdown Content" }
+              - column: { name: code, value: "MARKDOWN" }
+              - column: { name: description, value: "Displays markdown-formatted content" }
+              - column: { name: is_active, valueBoolean: true }
+              - column: { name: sort_order, valueNumeric: 9 }
+              - column: { name: create_date, valueComputed: CURRENT_TIMESTAMP }
+              - column: { name: modify_date, valueComputed: CURRENT_TIMESTAMP }
+        - insert:
+            tableName: ${cms.tablePrefix}page_section_type
+            columns:
+              - column: { name: name, value: "Featured Posts" }
+              - column: { name: code, value: "FEATURED_POSTS" }
+              - column: { name: description, value: "Displays latest featured blog posts in a grid" }
+              - column: { name: is_active, valueBoolean: true }
+              - column: { name: sort_order, valueNumeric: 10 }
+              - column: { name: create_date, valueComputed: CURRENT_TIMESTAMP }
+              - column: { name: modify_date, valueComputed: CURRENT_TIMESTAMP }
+        - insert:
+            tableName: ${cms.tablePrefix}page_section_type
+            columns:
+              - column: { name: name, value: "Social Links" }
+              - column: { name: code, value: "SOCIAL_LINKS" }
+              - column: { name: description, value: "Displays social media links with icons" }
+              - column: { name: is_active, valueBoolean: true }
+              - column: { name: sort_order, valueNumeric: 11 }
+              - column: { name: create_date, valueComputed: CURRENT_TIMESTAMP }
+              - column: { name: modify_date, valueComputed: CURRENT_TIMESTAMP }
+        - insert:
+            tableName: ${cms.tablePrefix}page_section_type
+            columns:
+              - column: { name: name, value: "Image Carousel" }
+              - column: { name: code, value: "IMAGE_CAROUSEL" }
+              - column: { name: description, value: "Displays images in a rotating carousel" }
+              - column: { name: is_active, valueBoolean: true }
+              - column: { name: sort_order, valueNumeric: 12 }
+              - column: { name: create_date, valueComputed: CURRENT_TIMESTAMP }
+              - column: { name: modify_date, valueComputed: CURRENT_TIMESTAMP }
+
