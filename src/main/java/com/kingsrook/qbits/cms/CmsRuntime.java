@@ -24,28 +24,25 @@ import com.kingsrook.qqq.backend.core.model.metadata.qbits.QBitMetaData;
 
 
 /*******************************************************************************
- ** Runtime state of one CMS install: its config and the result of the startup
- ** schema check. Code that runs per request (widget renderers, processes)
+ ** Runtime state of one CMS install, held by its config: the result of the
+ ** startup schema check. Code that runs per request (widget renderers, processes)
  ** finds it by the install's name prefix, so two installs in one instance
  ** (two namespaces) stay apart.
  *******************************************************************************/
 public class CmsRuntime
 {
-   private final CmsQBitConfig config;
-   private final List<String>  schemaProblems;
+   private final List<String> schemaProblems;
 
 
 
    /*******************************************************************************
     ** Constructor.
     **
-    ** @param config         the install's config
     ** @param schemaProblems what the startup schema check found (empty when fine
     **                       or not checked)
     *******************************************************************************/
-   public CmsRuntime(CmsQBitConfig config, List<String> schemaProblems)
+   public CmsRuntime(List<String> schemaProblems)
    {
-      this.config = config;
       this.schemaProblems = List.copyOf(schemaProblems);
    }
 
@@ -72,16 +69,6 @@ public class CmsRuntime
          }
       }
       return (Optional.empty());
-   }
-
-
-
-   /*******************************************************************************
-    ** Getter for config
-    *******************************************************************************/
-   public CmsQBitConfig getConfig()
-   {
-      return (config);
    }
 
 

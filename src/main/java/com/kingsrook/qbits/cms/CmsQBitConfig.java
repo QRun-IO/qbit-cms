@@ -23,6 +23,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.regex.Pattern;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.kingsrook.qbits.cms.security.CmsRole;
 import com.kingsrook.qqq.backend.core.model.metadata.QBackendMetaData;
 import com.kingsrook.qqq.backend.core.model.metadata.QInstance;
@@ -527,8 +528,10 @@ public class CmsQBitConfig implements QBitConfig
 
 
    /*******************************************************************************
-    ** The install's runtime state, set when the qbit is produced.
+    ** The install's runtime state, set when the qbit is produced (not part of
+    ** the config's JSON: tables carry their source qbit config to the frontend).
     *******************************************************************************/
+   @JsonIgnore
    public CmsRuntime getRuntime()
    {
       return (this.runtime);

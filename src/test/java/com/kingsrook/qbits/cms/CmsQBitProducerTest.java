@@ -84,6 +84,7 @@ class CmsQBitProducerTest
 
       QAppMetaData top = qInstance.getApp("cms");
       assertThat(top.getLabel()).isEqualTo("CMS");
+      assertThat(qInstance.getTable("cms_page_section_type").getLabel()).isEqualTo("Page Section Types");
       assertThat(top.getWidgets()).containsExactly("cmsHome");
       assertThat(top.getChildren()).extracting("name").containsExactly("cmsSites", "cmsPages", "cmsNavigation");
       assertThat(qInstance.getApp("cmsPages").getWidgets()).containsExactly("cmsPagesHome");

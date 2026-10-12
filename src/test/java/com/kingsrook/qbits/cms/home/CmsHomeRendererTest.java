@@ -23,6 +23,7 @@ import com.kingsrook.qbits.cms.CmsQBitConfig;
 import com.kingsrook.qbits.cms.CmsQBitProducer;
 import com.kingsrook.qbits.cms.CmsStartupMode;
 import com.kingsrook.qbits.cms.CmsTestSupport;
+import com.kingsrook.qbits.cms.metadata.CmsTableDefinition;
 import com.kingsrook.qbits.cms.security.CmsRole;
 import com.kingsrook.qbits.cms.security.CmsSecurity;
 import com.kingsrook.qqq.backend.core.actions.dashboard.RenderWidgetAction;
@@ -74,7 +75,7 @@ class CmsHomeRendererTest
       assertThat(top).contains("Sites", "Pages", "Navigation", "/app/cmsPages", "0 pages");
 
       String sites = render(qInstance, "cmsSitesHome");
-      assertThat(sites).contains("Nothing yet", "4 redirect types", "/app/cms_redirect_type", "New site");
+      assertThat(sites).contains("Nothing yet", "Needs attention", "everything here is published and active", "New site", "New redirect");
    }
 
 
@@ -97,11 +98,14 @@ class CmsHomeRendererTest
       insert("cms_snippet", new QRecord().withValue("name", "Footer").withValue("shortName", "footer").withValue("siteId", siteId).withValue("isActive", false));
 
       String top = render(qInstance, "cmsHome");
-      assertThat(top).contains("2 pages", "1 draft", "1 site");
+      assertThat(top).contains("2 pages", "1 unpublished", "1 site");
 
       String pages = render(qInstance, "cmsPagesHome");
-      assertThat(pages).contains("Welcome &lt;home&gt;", "Work in progress", "/app/cms_page/", "1 inactive", "Recently changed", "4 page types");
+      assertThat(pages).contains("Welcome &lt;home&gt;", "Work in progress", "/app/cms_page/", "Unpublished pages", "Inactive snippets", "Recently changed", "New page");
       assertThat(pages).doesNotContain("Welcome <home>");
+
+      CmsTestSupport.session(qInstance, CmsSecurity.permissionsFor(config, Set.of(CmsRole.VIEWER)));
+      assertThat(render(qInstance, "cmsPagesHome")).contains("Work in progress").doesNotContain("New page");
    }
 
 
@@ -140,7 +144,8 @@ class CmsHomeRendererTest
    {
       assertThat(CmsHomeRenderer.plural(1, "Page")).isEqualTo("1 page");
       assertThat(CmsHomeRenderer.plural(2, "Page Type")).isEqualTo("2 page types");
-      assertThat(CmsHomeRenderer.pluralize("category")).isEqualTo("categories");
+      assertThat(CmsTableDefinition.pluralize("Category")).isEqualTo("Categories");
+      assertThat(CmsTableDefinition.pluralize("Key")).isEqualTo("Keys");
       assertThat(CmsHtml.escape(null)).isEmpty();
       assertThat(CmsHtml.escape("<a href='x'>&\"")).isEqualTo("&lt;a href=&#39;x&#39;&gt;&amp;&quot;");
    }

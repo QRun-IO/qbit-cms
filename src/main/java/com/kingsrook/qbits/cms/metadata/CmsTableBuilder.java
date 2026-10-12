@@ -144,7 +144,7 @@ public class CmsTableBuilder
       String         name  = config.applyPrefix(definition.logicalName());
       QTableMetaData table = new QTableMetaData()
          .withName(name)
-         .withLabel(definition.label())
+         .withLabel(definition.pluralLabel())
          .withIcon(new QIcon(definition.icon()))
          .withBackendName(config.getBackendName())
          .withBackendDetails(new RDBMSTableBackendDetails().withTableName(name))

@@ -34,12 +34,15 @@ import com.kingsrook.qbits.cms.metadata.CmsAreas;
 import com.kingsrook.qbits.cms.metadata.CmsTableDefinition;
 import com.kingsrook.qqq.backend.core.actions.dashboard.widgets.AbstractWidgetRenderer;
 import com.kingsrook.qqq.backend.core.actions.permissions.PermissionEnforcement;
+import com.kingsrook.qqq.backend.core.actions.permissions.PermissionsHelper;
+import com.kingsrook.qqq.backend.core.actions.permissions.TablePermissionSubType;
 import com.kingsrook.qqq.backend.core.actions.tables.CountAction;
 import com.kingsrook.qqq.backend.core.actions.tables.QueryAction;
 import com.kingsrook.qqq.backend.core.context.QContext;
 import com.kingsrook.qqq.backend.core.exceptions.QException;
 import com.kingsrook.qqq.backend.core.exceptions.QPermissionDeniedException;
 import com.kingsrook.qqq.backend.core.model.actions.tables.count.CountInput;
+import com.kingsrook.qqq.backend.core.model.actions.tables.insert.InsertInput;
 import com.kingsrook.qqq.backend.core.model.actions.tables.query.QCriteriaOperator;
 import com.kingsrook.qqq.backend.core.model.actions.tables.query.QFilterCriteria;
 import com.kingsrook.qqq.backend.core.model.actions.tables.query.QFilterOrderBy;
@@ -59,14 +62,15 @@ import com.kingsrook.qqq.backend.core.model.metadata.tables.QTableMetaData;
  ** home owns its data and shows only real data read as the current user, so
  ** a table the user may not read is left out instead of shown as zero:
  **
- ** - the top home: one card per area with its main tables' counts (and draft
- **   pages), linking to the area; no per-record lists, so nothing duplicates
- **   an area home;
+ ** - the top home: one card per area with its main tables' counts (and
+ **   unpublished pages), linking to the area; no per-record lists, so nothing
+ **   duplicates an area home;
+ ** - an area home: what needs attention (unpublished or inactive rows), the
+ **   create actions the user may run, and the area's recently changed
+ **   records. Next's app page lists the tables and counts below it.
+ **
  ** Reads always run with PermissionEnforcement.ENFORCE: a widget renders
  ** inside a trusted scope, and these counts must still be the user's own.
- **
- ** - an area home: a tile per main table (count, drafts or inactive rows),
- **   the area's recently changed records, and its settings tables.
  *******************************************************************************/
 public class CmsHomeRenderer extends AbstractWidgetRenderer
 {
@@ -146,44 +150,52 @@ public class CmsHomeRenderer extends AbstractWidgetRenderer
 
 
    /*******************************************************************************
-    ** An area home.
+    ** An area home. Next's app page already lists the area's tables with their
+    ** record counts, so this home shows only what that list cannot: what needs
+    ** attention, the create actions the user may run, and recent changes.
     *******************************************************************************/
    String renderArea(CmsQBitConfig config, CmsAreas.Area area) throws QException
    {
-      StringBuilder      html   = new StringBuilder();
-      List<CmsHtml.Tile> tiles  = new ArrayList<>();
-      List<QRecord>      recent = new ArrayList<>();
+      StringBuilder      html      = new StringBuilder();
+      List<CmsHtml.Tile> attention = new ArrayList<>();
+      List<String>       actions   = new ArrayList<>();
+      List<QRecord>      recent    = new ArrayList<>();
+      boolean            readable  = false;
       for(String logical : area.mainTables())
       {
          String table = config.applyPrefix(logical);
-         Long   count = count(table, null);
-         if(count == null)
+         if(count(table, null) == null)
          {
             continue;
          }
-         List<String> notes = new ArrayList<>();
-         String       draft = draftNote(config, logical);
-         if(!draft.isEmpty())
+         readable = true;
+         if(hasField(table, "isPublished"))
          {
-            notes.add(draft.substring(2));
+            addAttention(attention, config, logical, "isPublished", "Unpublished ");
          }
-         else if(hasField(table, "isActive"))
+         if(hasField(table, "isActive"))
          {
-            Long inactive = count(table, new QQueryFilter(new QFilterCriteria("isActive", QCriteriaOperator.EQUALS, false)));
-            if(inactive != null && inactive > 0)
-            {
-               notes.add(CmsHtml.muted(inactive + " inactive"));
-            }
+            addAttention(attention, config, logical, "isActive", "Inactive ");
          }
-         notes.add(CmsHtml.link(tablePath(config, logical) + "/create", "New " + label(logical).toLowerCase(Locale.ROOT)));
-         tiles.add(new CmsHtml.Tile(pluralLabel(logical), String.valueOf(count), tablePath(config, logical), notes));
+         if(PermissionsHelper.hasTablePermission(new InsertInput(table), table, TablePermissionSubType.INSERT))
+         {
+            actions.add(CmsHtml.link(tablePath(config, logical) + "/create", "New " + label(logical).toLowerCase(Locale.ROOT)));
+         }
          recent.addAll(recent(table));
       }
-      if(tiles.isEmpty())
+      if(!readable)
       {
          return (CmsHtml.empty("You do not have access to " + CmsHtml.escape(area.label()) + "."));
       }
-      html.append(CmsHtml.tiles(tiles));
+
+      html.append(CmsHtml.heading("Needs attention"));
+      html.append(attention.isEmpty() ? CmsHtml.empty("Nothing: everything here is published and active.") : CmsHtml.tiles(attention));
+      if(!actions.isEmpty())
+      {
+         html.append("<div style=\"display:flex;flex-wrap:wrap;gap:6px 18px;margin-top:12px\">");
+         actions.forEach(a -> html.append("<span>").append(a).append("</span>"));
+         html.append("</div>");
+      }
 
       html.append(CmsHtml.heading("Recently changed"));
       recent.sort(Comparator.comparing((QRecord r) -> r.getValueInstant("modifyDate"), Comparator.nullsLast(Comparator.reverseOrder())));
@@ -196,32 +208,28 @@ public class CmsHomeRenderer extends AbstractWidgetRenderer
          List<CmsHtml.Row> rows = new ArrayList<>();
          for(QRecord record : recent.subList(0, Math.min(RECENT_ROWS, recent.size())))
          {
-            String table   = record.getTableName();
-            String logical = table.substring(config.getTableNamePrefix().length());
-            String title   = record.getRecordLabel() != null ? record.getRecordLabel() : label(logical) + " " + record.getValue("id");
-            Instant when   = record.getValueInstant("modifyDate");
+            String  logical = record.getTableName().substring(config.getTableNamePrefix().length());
+            String  title   = record.getRecordLabel() != null ? record.getRecordLabel() : label(logical) + " " + record.getValue("id");
+            Instant when    = record.getValueInstant("modifyDate");
             rows.add(new CmsHtml.Row(title, tablePath(config, logical) + "/" + record.getValue("id"), label(logical) + (when == null ? "" : " · " + DATE.format(when))));
          }
          html.append(CmsHtml.rows(rows));
       }
-
-      List<String> settings = new ArrayList<>();
-      for(String logical : area.settingsTables())
-      {
-         Long count = count(config.applyPrefix(logical), null);
-         if(count != null)
-         {
-            settings.add(CmsHtml.link(tablePath(config, logical), plural(count, label(logical))));
-         }
-      }
-      if(!settings.isEmpty())
-      {
-         html.append(CmsHtml.heading("Settings"));
-         html.append("<div style=\"display:flex;flex-wrap:wrap;gap:6px 18px\">");
-         settings.forEach(s -> html.append("<span>").append(s).append("</span>"));
-         html.append("</div>");
-      }
       return (html.toString());
+   }
+
+
+
+   /*******************************************************************************
+    ** A "needs attention" tile when some rows of a table have a flag off.
+    *******************************************************************************/
+   private void addAttention(List<CmsHtml.Tile> tiles, CmsQBitConfig config, String logical, String flagField, String labelPrefix) throws QException
+   {
+      Long count = count(config.applyPrefix(logical), new QQueryFilter(new QFilterCriteria(flagField, QCriteriaOperator.EQUALS, false)));
+      if(count != null && count > 0)
+      {
+         tiles.add(new CmsHtml.Tile(labelPrefix + pluralLabel(logical).toLowerCase(Locale.ROOT), String.valueOf(count), tablePath(config, logical), List.of()));
+      }
    }
 
 
@@ -237,7 +245,7 @@ public class CmsHomeRenderer extends AbstractWidgetRenderer
          return ("");
       }
       Long drafts = count(table, new QQueryFilter(new QFilterCriteria("isPublished", QCriteriaOperator.EQUALS, false)));
-      return (drafts == null || drafts == 0 ? "" : ", " + CmsHtml.muted(drafts + (drafts == 1 ? " draft" : " drafts")));
+      return (drafts == null || drafts == 0 ? "" : ", " + CmsHtml.muted(drafts + " unpublished"));
    }
 
 
@@ -319,7 +327,7 @@ public class CmsHomeRenderer extends AbstractWidgetRenderer
     *******************************************************************************/
    private static String pluralLabel(String logical)
    {
-      return (pluralize(label(logical)));
+      return (CmsTableDefinition.pluralize(label(logical)));
    }
 
 
@@ -330,16 +338,6 @@ public class CmsHomeRenderer extends AbstractWidgetRenderer
    static String plural(long count, String label)
    {
       String lower = label.toLowerCase(Locale.ROOT);
-      return (count + " " + (count == 1 ? lower : pluralize(lower)));
-   }
-
-
-
-   /*******************************************************************************
-    **
-    *******************************************************************************/
-   static String pluralize(String word)
-   {
-      return (word.endsWith("y") && !word.endsWith("ay") ? word.substring(0, word.length() - 1) + "ies" : word + "s");
+      return (count + " " + (count == 1 ? lower : CmsTableDefinition.pluralize(lower)));
    }
 }

@@ -215,7 +215,7 @@ public class CmsQBitProducer implements QBitMetaDataProducer<CmsQBitConfig>
       {
          LOG.warn("The CMS database is not up to date; starting degraded", logPair("problems", problems));
       }
-      qBitConfig.setRuntime(new CmsRuntime(qBitConfig, problems));
+      qBitConfig.setRuntime(new CmsRuntime(problems));
 
       LOG.info("CMS QBit produced", logPair("version", VERSION), logPair("backendName", qBitConfig.getBackendName()),
          logPair("tablePrefix", qBitConfig.getTableNamePrefix()), logPair("features", qBitConfig.getFeatures()),

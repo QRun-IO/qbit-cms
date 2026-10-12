@@ -19,6 +19,7 @@ package com.kingsrook.qbits.cms.metadata;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.Set;
 import com.kingsrook.qbits.cms.CmsFeature;
 import com.kingsrook.qqq.backend.core.model.data.QRecordEntity;
@@ -33,7 +34,7 @@ import com.kingsrook.qqq.backend.core.model.metadata.tables.Tier;
  ** @param logicalName       the unprefixed table name, e.g. "page"
  ** @param entityClass       the entity whose fields the table has
  ** @param feature           the feature that owns the table
- ** @param label             the table label
+ ** @param label             the singular label ("Page"); the table label is the plural
  ** @param icon              a Material icon name
  ** @param kind              main table, child table or reference data
  ** @param recordLabelFields fields of the record label (joined by spaces)
@@ -89,6 +90,28 @@ public record CmsTableDefinition(String logicalName, Class<? extends QRecordEnti
     *******************************************************************************/
    public record Child(String childLogicalName, String joinField, String label, String associationName, String orderBy)
    {
+   }
+
+
+
+   /*******************************************************************************
+    ** The plural label (the QQQ table label, as in the nav): "Pages".
+    *******************************************************************************/
+   public String pluralLabel()
+   {
+      return (pluralize(label));
+   }
+
+
+
+   /*******************************************************************************
+    ** English plural of a label's last word ("Page Type" to "Page Types",
+    ** "Category" to "Categories").
+    *******************************************************************************/
+   public static String pluralize(String word)
+   {
+      String lower = word.toLowerCase(Locale.ROOT);
+      return (lower.endsWith("y") && !lower.endsWith("ay") && !lower.endsWith("ey") ? word.substring(0, word.length() - 1) + "ies" : word + "s");
    }
 
 
